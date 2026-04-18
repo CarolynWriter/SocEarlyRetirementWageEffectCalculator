@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Social Security Earnings Calculator 2026</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f5f2ee;
+      --card: #ffffff;
+      --text: #1a1a1a;
+      --muted: #6b6b6b;
+      --accent: #1d5c4a;
+      --accent-light: #e8f2ef;
+      --border: #e0dcd6;
+      --danger: #a33030;
+      --danger-light: #fdf0f0;
+      --total-bg: #1d5c4a;
+      --total-text: #ffffff;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+    }
+
+    header {
+      text-align: center;
+      max-width: 520px;
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(1.8rem, 5vw, 2.6rem);
+      line-height: 1.2;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      font-size: 0.95rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 2rem;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+    }
+
+    .field { margin-bottom: 1.25rem; }
+
+    .field label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    .input-wrap span {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.95rem;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 0.65rem 1rem 0.65rem 2rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .field input:focus {
+      border-color: var(--accent);
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 1.75rem 0;
+    }
+
+    .results { display: none; }
+
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    .result-row:last-of-type { border-bottom: none; }
+
+    .result-label { color: var(--muted); }
+
+    .result-value {
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .result-value.negative { color: var(--danger); }
+
+    .warning-box {
+      display: none;
+      background: var(--danger-light);
+      border-left: 3px solid var(--danger);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      font-size: 0.82rem;
+      color: var(--danger);
+      margin-top: 1rem;
+      line-height: 1.5;
+    }
+
+    .total-box {
+      background: var(--total-bg);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-top: 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .total-box .tl {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.75);
+    }
+
+    .total-box .tv {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.8rem;
+      color: #ffffff;
+    }
+
+    footer {
+      margin-top: 1.5rem;
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--muted);
+      max-width: 480px;
+      line-height: 1.6;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    footer a:hover { text-decoration: underline; }
+
+    .pill {
+      display: inline-block;
+      background: var(--accent-light);
+      color: var(--accent);
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-bottom: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="pill">2026 SSA Earnings Test</div>
+    <h1>Social Security Earnings Calculator</h1>
+    <p>Estimate your total gross income if you collect Social Security before full retirement age while still working.</p>
+  </header>
+
+  <div class="card">
+    <p class="section-label">Your information</p>
+
+    <div class="field">
+      <label for="monthly">Monthly SS benefit</label>
+      <div class="input-wrap">
+        <span>$</span>
+        <input type="number" id="monthly" placeholder="0.00" min="0" oninput="calculate()" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="wages">Gross yearly wages</label>
+      <div class="input-wrap">
+        <span>$</span>
+        <input type="number" id="wages" placeholder="0.00" min="0" oninput="calculate()" />
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <div class="results" id="results">
+      <p class="section-label">Breakdown</p>
+
+      <div class="result-row">
+        <span class="result-label">Total SS in one year</span>
+        <span class="result-value" id="r-total-ss"></span>
+      </div>
+      <div class="result-row">
+        <span class="result-label">2026 earnings limit</span>
+        <span class="result-value">$24,480</span>
+      </div>
+      <div class="result-row">
+        <span class="result-label">Excess earnings</span>
+        <span class="result-value" id="r-excess"></span>
+      </div>
+      <div class="result-row">
+        <span class="result-label">Total benefit reduction</span>
+        <span class="result-value negative" id="r-reduction"></span>
+      </div>
+      <div class="result-row">
+        <span class="result-label">SS benefit after penalty</span>
+        <span class="result-value" id="r-net-ss"></span>
+      </div>
+
+      <div class="warning-box" id="warn-zero">
+        Your Social Security benefit is fully withheld at this income level. You would receive $0 in SS benefits this year.
+      </div>
+
+      <div class="total-box">
+        <span class="tl">Total gross income</span>
+        <span class="tv" id="r-total"></span>
+      </div>
+    </div>
+
+    <div id="placeholder" style="text-align:center; color: var(--muted); font-size: 0.875rem; padding: 1rem 0;">
+      Enter your information above to see results.
+    </div>
+  </div>
+
+  <footer>
+    Based on the <a href="https://www.ssa.gov/benefits/retirement/planner/whileworking.html" target="_blank">SSA 2026 earnings test</a>. 
+    Applies to individuals under full retirement age for the entire year. 
+    This tool is for estimation only — consult a financial advisor for personalized guidance.
+  </footer>
+
+  <script>
+    function fmt(n) {
+      return '$' + Math.round(n).toLocaleString();
+    }
+
+    function calculate() {
+      const monthly = parseFloat(document.getElementById('monthly').value) || 0;
+      const wages   = parseFloat(document.getElementById('wages').value)   || 0;
+
+      const results     = document.getElementById('results');
+      const placeholder = document.getElementById('placeholder');
+
+      if (!monthly && !wages) {
+        results.style.display     = 'none';
+        placeholder.style.display = 'block';
+        return;
+      }
+
+      const limit      = 24480;
+      const totalSS    = monthly * 12;
+      const excess     = Math.max(0, wages - limit);
+      const reduction  = excess / 2;
+      const netSS      = Math.max(0, totalSS - reduction);
+      const totalIncome = wages + netSS;
+
+      document.getElementById('r-total-ss').textContent  = fmt(totalSS);
+      document.getElementById('r-excess').textContent    = fmt(excess);
+      document.getElementById('r-reduction').textContent = excess > 0 ? '-' + fmt(reduction) : fmt(0);
+      document.getElementById('r-net-ss').textContent    = fmt(netSS);
+      document.getElementById('r-total').textContent     = fmt(totalIncome);
+
+      document.getElementById('warn-zero').style.display =
+        (netSS === 0 && totalSS > 0) ? 'block' : 'none';
+
+      results.style.display     = 'block';
+      placeholder.style.display = 'none';
+    }
+  </script>
+
+</body>
+</html>
