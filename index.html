@@ -3,318 +3,1304 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Social Security Earnings Prior to FRA Calculator 2026</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
+  <title>Social Security Earnings Calculator 2026</title>
+
+  <!--
+  ============================================================
+  SOCIAL SECURITY EARNINGS CALCULATOR — 2026
+  ============================================================
+  PURPOSE:
+    Estimates total pre-tax income for someone collecting
+    Social Security benefits before Full Retirement Age (FRA)
+    while still earning wages.
+
+  THREE SCENARIOS COVERED:
+    1. Continuing year   — Under FRA the entire calendar year.
+                           Rule: $1 withheld per $2 earned over $24,480.
+    2. Year reaching FRA — Reaches FRA sometime during the year.
+                           Rule: $1 withheld per $3 earned over $59,520,
+                           counting only wages before the FRA month.
+    3. First year collecting — First calendar year receiving SS.
+                           Rule: Monthly earnings test of $2,040/month
+                           rather than the annual test.
+
+  DESIGN:
+    - Light/dark mode auto-detection via CSS prefers-color-scheme.
+    - Side columns are purely decorative, evoking an SS card aesthetic.
+    - All colors use CSS custom properties so both modes share one stylesheet.
+    - Popup help buttons explain each field; FAQ panel answers common questions.
+    - Fully self-contained: no external scripts or stylesheets required.
+
+  CUSTOMIZATION GUIDE:
+    - To update earnings limits for a future year, search the JavaScript
+      section for the values 24480, 59520, and 2040 and update them.
+    - To edit help text or FAQ answers, find the HELP object in the script.
+    - To change colors, edit the CSS custom properties in :root and the
+      @media (prefers-color-scheme: dark) block.
+  ============================================================
+  -->
+
   <style>
+
+    /* ── Reset ──────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* ── Color tokens — Light mode (default) ────────────────── */
     :root {
-      --bg: #232378;
-      --card: #87ccff;
-      --text: #ffffff;
-      --muted: #ffffff;
-      --accent: #aaaaff;
-      --accent-light: #e8f2ef;
-      --border: #ffffff;
-      --danger: #ff0000;
-      --danger-light: #ff0000;
-      --total-bg: #333388;
-      --total-text: #87ccff;
+      --bg:           #f4f6f9;   /* Page background */
+      --col-bg:       #e2eaf5;   /* Decorative side column background */
+      --col-border:   #a8bbd8;   /* Side column border */
+      --card-bg:      #ffffff;   /* Main calculator card */
+      --card-border:  #c0cce0;   /* Card border */
+      --bar-bg:       #dce4f0;   /* Top bar above card */
+      --teal:         #0f766e;   /* Primary accent: labels, links, totals */
+      --teal-dim:     #0d9488;   /* Secondary teal: borders, info boxes */
+      --gold:         #92650a;   /* Badge and decorative accent */
+      --gold-dim:     #b07d12;   /* Gold borders */
+      --text:         #111827;   /* Primary body text */
+      --text-dim:     #374151;   /* Secondary text, result labels */
+      --text-muted:   #6b7280;   /* Placeholder text, footer */
+      --input-bg:     #f9fafb;   /* Input field background */
+      --input-border: #9ca3af;   /* Input field border */
+      --divider:      #d1d5db;   /* Horizontal rule between sections */
+      --danger:       #b91c1c;   /* Negative values, warnings */
+      --total-bg:     #e8edf5;   /* Total income box background */
+      --total-text:   #0f766e;   /* Total income figure color */
+      --info-bg:      #f0fdf9;   /* Scenario info box background */
+      --info-border:  #0d9488;   /* Scenario info box left border */
+      --warn-bg:      #fff7f7;   /* Zero-benefit warning background */
+      --wave:         rgba(13,148,136,0.18);  /* Teal wave fill in columns */
+      --wave2:        rgba(146,101,10,0.10);  /* Gold wave fill in columns */
     }
 
+    /* ── Color tokens — Dark mode (follows OS or browser setting) ── */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:           #0f1a2e;
+        --col-bg:       #101e33;
+        --col-border:   #1e3a5f;
+        --card-bg:      #1a2d4a;
+        --card-border:  #2a4a6e;
+        --bar-bg:       #0d2340;
+        --teal:         #2dd4bf;
+        --teal-dim:     #1a9e8e;
+        --gold:         #d4a843;
+        --gold-dim:     #a07830;
+        --text:         #f0f4f8;
+        --text-dim:     #cbd5e1;
+        --text-muted:   #94a3b8;
+        --input-bg:     #0f1a2e;
+        --input-border: #2a4a6e;
+        --divider:      #1e3a5f;
+        --danger:       #f87171;
+        --total-bg:     #0d2340;
+        --total-text:   #2dd4bf;
+        --info-bg:      rgba(45,212,191,0.07);
+        --info-border:  #1a9e8e;
+        --warn-bg:      rgba(248,113,113,0.08);
+        --wave:         rgba(45,212,191,0.13);
+        --wave2:        rgba(212,168,67,0.09);
+      }
+    }
+
+    /* ── Base typography ────────────────────────────────────── */
     body {
-      font-family: 'DM Sans', sans-serif;
+      margin: 0;
+      padding: 0;
       background: var(--bg);
-      color: var(--text);
+      font-family: Georgia, 'Times New Roman', serif;
+    }
+
+    /* ── Page layout: three columns ─────────────────────────────
+       left deco column | main content | right deco column
+    ─────────────────────────────────────────────────────────── */
+    .page-wrap {
+      display: flex;
       min-height: 100vh;
+      align-items: stretch;
+    }
+
+    /* ── Decorative side columns ─────────────────────────────────
+       These columns are purely visual. They evoke a Social Security
+       card through abstract wave patterns, dashed lines, and
+       geometric shapes. They contain no official text or branding.
+    ─────────────────────────────────────────────────────────── */
+    .col-side {
+      width: 110px;
+      flex-shrink: 0;
+      background: var(--col-bg);
+      border-right: 2px solid var(--col-border);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .col-side.right {
+      border-right: none;
+      border-left: 2px solid var(--col-border);
+    }
+
+    /* SVG artwork fills the entire column height */
+    .col-side svg.col-art {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+    }
+
+    /* ── Main content area ──────────────────────────────────── */
+    .main-content {
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 2rem 1rem 4rem;
+      padding: 2.5rem 1.5rem 4rem;
+      min-width: 0; /* Prevents flex overflow on narrow screens */
     }
 
+    /* ── Header badge (pill) ────────────────────────────────── */
+    .pill {
+      display: inline-block;
+      background: transparent;
+      color: var(--gold);
+      font-size: 1.1rem;
+      font-weight: bold;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 7px 22px;
+      border-radius: 4px;
+      border: 2px solid var(--gold-dim);
+      margin-bottom: 1rem;
+      font-family: Georgia, serif;
+    }
+
+    /* ── Page header ────────────────────────────────────────── */
     header {
       text-align: center;
-      max-width: 520px;
-      margin-bottom: 2rem;
+      max-width: 580px;
+      margin-bottom: 2.25rem;
     }
 
-    header h1 {
-      font-family: 'DM Serif Display', serif;
-      font-size: clamp(1.8rem, 5vw, 2.6rem);
+    header h2 {
+      font-family: Georgia, 'Times New Roman', serif;
+      /* clamp() scales the font between 2rem and 2.75rem based on viewport */
+      font-size: clamp(2rem, 4.5vw, 2.75rem);
       line-height: 1.2;
       color: var(--text);
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.75rem;
+      font-weight: normal;
     }
 
     header p {
-      font-size: 1rem;
-      color: var(--muted);
-      line-height: 1.6;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 1.15rem;
+      color: var(--text-dim);
+      line-height: 1.75;
     }
 
-    .card {
-      background: var(--card);
-      border-radius: 16px;
-      border: 1px solid var(--border);
-      padding: 2rem;
+    /* ── FAQ/Help button in header ──────────────────────────── */
+    .faq-btn {
+      margin-top: 1rem;
+      background: transparent;
+      border: 2px solid var(--teal-dim);
+      color: var(--teal);
+      padding: 0.55rem 1.5rem;
+      border-radius: 4px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-family: Arial, sans-serif;
+      letter-spacing: 0.05em;
+      font-weight: bold;
+    }
+    .faq-btn:hover { background: var(--info-bg); }
+
+    /* ── Decorative bar above the card ──────────────────────────
+       Mimics a government document header with a form reference number.
+    ─────────────────────────────────────────────────────────── */
+    .card-header-bar {
+      background: var(--bar-bg);
+      border-radius: 6px 6px 0 0;
+      border: 1.5px solid var(--card-border);
+      border-bottom: 2.5px solid var(--teal-dim);
+      padding: 0.7rem 1.5rem;
       width: 100%;
-      max-width: 480px;
+      max-width: 560px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
-    .section-label {
-      font-size: 1rem;
-      font-weight: 500;
-      letter-spacing: 0.1em;
+    .card-header-bar span {
+      font-size: 0.8rem;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 1.25rem;
+      color: var(--teal);
+      font-family: Arial, sans-serif;
+      font-weight: bold;
     }
 
-    .field { margin-bottom: 1.77rem; }
+    .bar-dots { color: var(--gold); font-size: 1rem; letter-spacing: 3px; }
+
+    /* ── Main calculator card ───────────────────────────────── */
+    .card {
+      background: var(--card-bg);
+      border-radius: 0 0 8px 8px;
+      border: 1.5px solid var(--card-border);
+      border-top: none; /* Top border provided by .card-header-bar */
+      padding: 2.25rem 2.5rem;
+      width: 100%;
+      max-width: 560px;
+    }
+
+    /* ── Section headings inside the card ──────────────────── */
+    .section-label {
+      font-size: 0.85rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 1.5rem;
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      border-bottom: 1px solid var(--divider);
+      padding-bottom: 0.6rem;
+    }
+
+    /* ── Input field wrapper ────────────────────────────────── */
+    .field { margin-bottom: 1.75rem; }
+
+    /* Row holding label + ? help button side by side */
+    .field-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
 
     .field label {
-      display: block;
-      font-size: 1rem;
-      font-weight: 500;
+      font-size: 1.2rem;
       color: var(--text);
-      margin-bottom: 6px;
+      font-family: Arial, Helvetica, sans-serif;
+      font-weight: bold;
     }
 
-    .input-wrap {
-      position: relative;
+    /* Small explanatory text below certain labels */
+    .hint {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      line-height: 1.6;
+      font-family: Arial, sans-serif;
     }
 
-    .input-wrap span {
+    /* ── Dollar-sign prefix inside number inputs ────────────── */
+    .input-wrap { position: relative; }
+
+    .input-wrap .prefix {
       position: absolute;
-      left: 14px;
+      left: 16px;
       top: 50%;
       transform: translateY(-50%);
-      font-size: 1rem;
-      color: var(--muted);
-      pointer-events: none;
+      font-size: 1.2rem;
+      color: var(--teal);
+      pointer-events: none; /* Clicks pass through to the input */
+      font-family: Arial, sans-serif;
+      font-weight: bold;
     }
 
-    .field input {
+    /* ── Number inputs ──────────────────────────────────────── */
+    .field input[type=number] {
       width: 100%;
-      padding: 0.65rem 1rem 0.65rem 2rem;
-      font-family: 'DM Sans', sans-serif;
-      font-size: 1rem;
+      padding: 0.85rem 1rem 0.85rem 2.5rem; /* Extra left room for $ prefix */
+      font-size: 1.2rem;
       color: var(--text);
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 10px;
+      background: var(--input-bg);
+      border: 2px solid var(--input-border);
+      border-radius: 6px;
       outline: none;
+      font-family: Arial, sans-serif;
+      appearance: none;
       transition: border-color 0.15s;
     }
 
-    .field input:focus {
-      border-color: var(--accent);
+    /* ── Dropdown selects ───────────────────────────────────── */
+    .field select {
+      width: 100%;
+      padding: 0.85rem 1rem; /* No left padding needed; no $ prefix */
+      font-size: 1.2rem;
+      color: var(--text);
+      background: var(--input-bg);
+      border: 2px solid var(--input-border);
+      border-radius: 6px;
+      outline: none;
+      font-family: Arial, sans-serif;
+      appearance: none;
+      cursor: pointer;
+      transition: border-color 0.15s;
     }
 
+    .field input:focus,
+    .field select:focus { border-color: var(--teal); }
+
+    /* ── Month pickers (conditionally visible) ──────────────────
+       Hidden by default. JavaScript shows them based on scenario:
+         #fra-month-field   → visible for "Year I reach FRA"
+         #first-month-field → visible for "First year collecting"
+    ─────────────────────────────────────────────────────────── */
+    .month-field { display: none; }
+
+    /* ── Divider between inputs and results ─────────────────── */
     .divider {
       border: none;
-      border-top: 1px solid var(--border);
-      margin: 1.75rem 0;
+      border-top: 1.5px solid var(--divider);
+      margin: 2rem 0;
     }
 
+    /* ── Results section ─────────────────────────────────────────
+       Hidden until the user enters at least one value.
+       JavaScript shows it and injects rows after calculate() runs.
+    ─────────────────────────────────────────────────────────── */
     .results { display: none; }
 
+    /* Each result row: label left, value right */
     .result-row {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      padding: 0.6rem 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.9rem;
+      padding: 0.85rem 0;
+      border-bottom: 1px solid var(--divider);
+      font-family: Arial, sans-serif;
     }
-
     .result-row:last-of-type { border-bottom: none; }
 
-    .result-label { color: var(--muted); }
+    .result-label { font-size: 1.1rem; color: var(--text-dim); }
+    .result-value { font-size: 1.2rem; font-weight: bold; color: var(--text); }
+    .result-value.negative { color: var(--danger); } /* Red for reductions */
 
-    .result-value {
-      font-weight: 500;
-      color: var(--text);
+    /* ── Scenario description box ───────────────────────────────
+       Teal left-border box that appears below the scenario picker.
+       Text is set by JavaScript when the scenario changes.
+    ─────────────────────────────────────────────────────────── */
+    .info-box {
+      background: var(--info-bg);
+      border-left: 4px solid var(--info-border);
+      border-radius: 0 6px 6px 0;
+      padding: 0.9rem 1.1rem;
+      font-size: 1rem;
+      color: var(--text-dim);
+      margin-bottom: 1.5rem;
+      line-height: 1.7;
+      display: none; /* Shown by JavaScript */
+      font-family: Arial, sans-serif;
     }
 
-    .result-value.negative { color: var(--danger); }
-
+    /* ── Warning box ─────────────────────────────────────────────
+       Shown when the earnings penalty wipes out the entire SS benefit.
+    ─────────────────────────────────────────────────────────── */
     .warning-box {
       display: none;
-      background: var(--danger-light);
-      border-left: 3px solid var(--danger);
-      border-radius: 6px;
-      padding: 0.75rem 1rem;
-      font-size: 0.82rem;
+      background: var(--warn-bg);
+      border-left: 4px solid var(--danger);
+      border-radius: 0 6px 6px 0;
+      padding: 0.9rem 1.1rem;
+      font-size: 1rem;
       color: var(--danger);
-      margin-top: 1rem;
-      line-height: 1.5;
+      margin-top: 1.25rem;
+      line-height: 1.6;
+      font-family: Arial, sans-serif;
     }
 
+    /* ── Total gross income box ─────────────────────────────── */
     .total-box {
       background: var(--total-bg);
-      border-radius: 12px;
-      padding: 1.25rem 1.5rem;
-      margin-top: 1.25rem;
+      border-radius: 6px;
+      border: 2px solid var(--teal-dim);
+      padding: 1.4rem 1.75rem;
+      margin-top: 1.5rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
     .total-box .tl {
-      font-size: 0.85rem;
-      color: rgba(255,255,255,0.75);
+      font-size: 1.1rem;
+      color: var(--text-dim);
+      font-family: Arial, sans-serif;
+      font-weight: bold;
     }
 
     .total-box .tv {
-      font-family: 'DM Serif Display', serif;
-      font-size: 1.8rem;
-      color: #ffffff;
+      font-family: Georgia, serif;
+      font-size: 2.25rem;
+      color: var(--total-text);
     }
 
-    footer {
-      margin-top: 1.5rem;
-      text-align: center;
-      font-size: 0.9rem;
-      color: var(--muted);
+    /* ── Field-level help buttons ("?" circles) ─────────────── */
+    .help-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: transparent;
+      border: 2px solid var(--teal-dim);
+      color: var(--teal);
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+    .help-btn:hover { background: var(--info-bg); }
+
+    /* ── Modal popup system ──────────────────────────────────────
+       The backdrop sits over the full page.
+       Adding class "open" makes it visible (display: flex).
+       Clicking the backdrop outside the white box closes it.
+    ─────────────────────────────────────────────────────────── */
+    .modal-backdrop {
+      display: none;
+      position: fixed; /* Covers viewport even when page is scrolled */
+      inset: 0;
+      background: rgba(5,10,20,0.75);
+      z-index: 100;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 80px;
+    }
+
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+      background: var(--card-bg);
+      border: 2px solid var(--teal-dim);
+      border-radius: 10px;
+      padding: 2.25rem;
       max-width: 480px;
-      line-height: 1.6;
+      width: 92%;
+      color: var(--text);
+      position: relative;
     }
 
-    footer a {
-      color: var(--accent);
-      text-decoration: none;
+    .modal h3 {
+      font-family: Georgia, serif;
+      font-size: 1.3rem;
+      color: var(--teal);
+      margin-bottom: 1rem;
+      font-weight: normal;
     }
 
+    .modal p,
+    .modal li {
+      font-size: 1rem;
+      line-height: 1.75;
+      color: var(--text-dim);
+      font-family: Arial, sans-serif;
+    }
+
+    .modal ul { padding-left: 1.5rem; margin-top: 0.6rem; }
+    .modal li { margin-bottom: 0.5rem; }
+    .modal a  { color: var(--teal); }
+
+    /* X close button in top-right of modal */
+    .modal-close {
+      position: absolute;
+      top: 1rem; right: 1rem;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.4rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      line-height: 1;
+    }
+    .modal-close:hover { color: var(--text); }
+
+    /* SSA attribution at the bottom of field-help modals */
+    .modal-footer {
+      margin-top: 1.25rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--divider);
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      font-family: Arial, sans-serif;
+    }
+
+    /* ── FAQ accordion inside the FAQ modal ─────────────────── */
+    .faq-item {
+      border-bottom: 1px solid var(--divider);
+      padding: 0.75rem 0;
+    }
+    .faq-item:last-child { border-bottom: none; }
+
+    /* Clickable question row */
+    .faq-q {
+      font-size: 1rem;
+      color: var(--teal);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      gap: 1rem;
+    }
+
+    /* Chevron rotates 180° when the answer is open */
+    .faq-q .arrow {
+      font-size: 0.75rem;
+      flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+    .faq-q.open .arrow { transform: rotate(180deg); }
+
+    /* Answer text — hidden by default, shown when class "open" is added */
+    .faq-a {
+      font-size: 0.95rem;
+      color: var(--text-dim);
+      line-height: 1.7;
+      padding-top: 0.6rem;
+      display: none;
+      font-family: Arial, sans-serif;
+    }
+    .faq-a.open { display: block; }
+
+    /* ── Page footer ────────────────────────────────────────── */
+    footer {
+      margin-top: 2rem;
+      text-align: center;
+      font-size: 1rem;
+      color: var(--text-muted);
+      max-width: 560px;
+      line-height: 1.75;
+      font-family: Arial, sans-serif;
+    }
+    footer a { color: var(--teal); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
 
-    .pill {
-      display: inline-block;
-      background: var(--accent-light);
-      color: var(--accent);
-      font-size: 0.7rem;
-      font-weight: 500;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      padding: 3px 10px;
-      border-radius: 20px;
-      margin-bottom: 0.75rem;
+    /* ── Empty state before any input is entered ────────────── */
+    #placeholder {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      padding: 1.5rem 0;
+      font-family: Arial, sans-serif;
     }
+
+    /* ── Responsive: collapse side columns on small screens ──── */
+    @media (max-width: 640px) {
+      .col-side { width: 18px; } /* Thin stripe remains for continuity */
+      .card { padding: 1.5rem; }
+    }
+
   </style>
 </head>
 <body>
 
-  <header>
-    <div class="pill">2026 SSA Earnings Test</div>
-    <h1>Social Security Earnings Calculator</h1>
-    <p>This app will estimate your total pre-tax income if you collect Social Security before full retirement age while still working. These values do not apply to the year your start collecting or the year you reach FRA. Those changes are coming.</p>
-  </header>
+<!-- ═══════════════════════════════════════════════════════════
+     PAGE STRUCTURE
+     .page-wrap
+       ├── .col-side.left    (decorative SVG column)
+       ├── .main-content     (header + card + footer)
+       └── .col-side.right   (decorative SVG column, mirrored)
+═══════════════════════════════════════════════════════════ -->
 
-  <div class="card">
-    <p class="section-label">Your information</p>
+<div class="page-wrap" id="app">
 
-    <div class="field">
-      <label for="monthly">Monthly SS benefit</label>
-      <div class="input-wrap">
-        <span>$</span>
-        <input type="number" id="monthly" placeholder="0.00" min="0" oninput="calculate()" />
-      </div>
-    </div>
+  <!-- Screen-reader only page title (visually hidden) -->
+  <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">
+    Social Security Earnings Calculator 2026
+  </h1>
 
-    <div class="field">
-      <label for="wages">Gross yearly wages</label>
-      <div class="input-wrap">
-        <span>$</span>
-        <input type="number" id="wages" placeholder="0.00" min="0" oninput="calculate()" />
-      </div>
-    </div>
-
-    <hr class="divider" />
-
-    <div class="results" id="results">
-      <p class="section-label">Breakdown</p>
-
-      <div class="result-row">
-        <span class="result-label">Total SS in one year</span>
-        <span class="result-value" id="r-total-ss"></span>
-      </div>
-      <div class="result-row">
-        <span class="result-label">2026 earnings limit</span>
-        <span class="result-value">$24,480</span>
-      </div>
-      <div class="result-row">
-        <span class="result-label">Excess earnings</span>
-        <span class="result-value" id="r-excess"></span>
-      </div>
-      <div class="result-row">
-        <span class="result-label">Total benefit reduction</span>
-        <span class="result-value negative" id="r-reduction"></span>
-      </div>
-      <div class="result-row">
-        <span class="result-label">SS benefit after penalty</span>
-        <span class="result-value" id="r-net-ss"></span>
-      </div>
-
-      <div class="warning-box" id="warn-zero">
-        Your Social Security benefit is fully withheld at this income level. You would receive $0 in SS benefits this year.
-      </div>
-
-      <div class="total-box">
-        <span class="tl">Total gross income</span>
-        <span class="tv" id="r-total"></span>
-      </div>
-    </div>
-
-    <div id="placeholder" style="text-align:center; color: var(--muted); font-size: 0.875rem; padding: 1rem 0;">
-      Enter your information above to see results.
+  <!-- ═══════════════════════════════════════════════════════
+       MODAL POPUP SYSTEM
+       One backdrop element is reused for all popups.
+       JavaScript swaps the inner HTML depending on which
+       help button or the FAQ button was clicked.
+       Clicking the grey backdrop area outside the white box
+       calls closeModal(), which closes it.
+  ═══════════════════════════════════════════════════════ -->
+  <div class="modal-backdrop" id="modal-backdrop" onclick="closeModal(event)">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAllModals()" aria-label="Close">&#x2715;</button>
+      <!-- Content injected here by openModal() in the script -->
+      <div id="modal-content"></div>
     </div>
   </div>
 
-  <footer>
-    Based on the <a href="https://www.ssa.gov/benefits/retirement/planner/whileworking.html" target="_blank">SSA 2026 earnings test</a>. 
-    Applies to individuals under full retirement age for the entire year. 
-    This tool is for estimation only — consult a financial advisor for personalized guidance.
-  </footer>
+  <!-- ═══════════════════════════════════════════════════════
+       LEFT DECORATIVE COLUMN
+       SVG artwork only — no text, no agency names or branding.
+       Pattern elements (top to bottom):
+         • Wave group 1     — teal lozenge waves at the top
+         • Dashed rules 1   — three horizontal dashed lines
+         • Card outline     — rectangle with placeholder lines
+                              (evokes the fields on an SS card)
+         • Compass circle   — gold dashed ring with crosshairs
+         • Wave group 2     — gold-tinted waves in the middle
+         • Dashed rules 2   — three more dashed lines
+         • Bar placeholders — three filled rectangles (like card data)
+         • Wave group 3     — teal waves at the bottom
+       All colors reference CSS variables, so dark mode is automatic.
+  ═══════════════════════════════════════════════════════ -->
+  <div class="col-side left" aria-hidden="true">
+    <svg class="col-art" viewBox="0 0 110 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
 
-  <script>
-    function fmt(n) {
-      return '$' + Math.round(n).toLocaleString();
+      <!-- Wave group 1: teal lozenge waves, top of column -->
+      <path d="M0,60 Q28,75 55,60 Q82,45 110,60 Q82,75 55,90 Q28,105 0,90 Z"       fill="var(--wave)" opacity="0.9"/>
+      <path d="M0,100 Q28,115 55,100 Q82,85 110,100 Q82,115 55,130 Q28,145 0,130 Z" fill="var(--wave)" opacity="0.7"/>
+      <path d="M0,140 Q28,155 55,140 Q82,125 110,140 Q82,155 55,170 Q28,185 0,170 Z" fill="var(--wave)" opacity="0.5"/>
+      <path d="M0,180 Q28,195 55,180 Q82,165 110,180 Q82,195 55,210 Q28,225 0,210 Z" fill="var(--wave)" opacity="0.3"/>
+
+      <!-- Dashed horizontal rule group 1 -->
+      <line x1="20" y1="260" x2="90" y2="260" stroke="var(--teal-dim)" stroke-width="0.75" stroke-dasharray="3 3" opacity="0.4"/>
+      <line x1="20" y1="275" x2="90" y2="275" stroke="var(--teal-dim)" stroke-width="0.75" stroke-dasharray="3 3" opacity="0.4"/>
+      <line x1="20" y1="290" x2="90" y2="290" stroke="var(--teal-dim)" stroke-width="0.75" stroke-dasharray="3 3" opacity="0.4"/>
+
+      <!-- Card outline with placeholder text lines -->
+      <rect x="30" y="330" width="50" height="34" rx="4" fill="none" stroke="var(--teal-dim)" stroke-width="1" opacity="0.35"/>
+      <line x1="38" y1="341" x2="72" y2="341" stroke="var(--teal-dim)" stroke-width="0.75" opacity="0.3"/>
+      <line x1="38" y1="349" x2="65" y2="349" stroke="var(--teal-dim)" stroke-width="0.75" opacity="0.3"/>
+      <line x1="38" y1="357" x2="68" y2="357" stroke="var(--teal-dim)" stroke-width="0.75" opacity="0.3"/>
+
+      <!-- Compass-rose circle in gold -->
+      <circle cx="55" cy="420" r="22" fill="none" stroke="var(--gold-dim)" stroke-width="1"    stroke-dasharray="4 2" opacity="0.35"/>
+      <circle cx="55" cy="420" r="15" fill="none" stroke="var(--gold-dim)" stroke-width="0.75" opacity="0.25"/>
+      <line x1="55" y1="405" x2="55" y2="435" stroke="var(--gold-dim)" stroke-width="0.75" opacity="0.25"/>
+      <line x1="40" y1="420" x2="70" y2="420" stroke="var(--gold-dim)" stroke-width="0.75" opacity="0.25"/>
+
+      <!-- Wave group 2: gold-tinted waves, middle of column -->
+      <path d="M10,490 Q55,500 100,490 Q55,510 10,500 Z" fill="var(--wave2)" opacity="0.8"/>
+      <path d="M10,508 Q55,518 100,508 Q55,528 10,518 Z" fill="var(--wave2)" opacity="0.6"/>
+      <path d="M10,526 Q55,536 100,526 Q55,546 10,536 Z" fill="var(--wave2)" opacity="0.4"/>
+
+      <!-- Dashed horizontal rule group 2 -->
+      <line x1="20" y1="590" x2="90" y2="590" stroke="var(--teal-dim)" stroke-width="0.75" stroke-dasharray="3 3" opacity="0.4"/>
+      <line x1="20" y1="605" x2="90" y2="605" stroke="var(--teal-dim)" stroke-width="0.75" stroke-dasharray="3 3" opacity="0.4"/>
+      <line x1="20" y1="620" x2="90" y2="620" stroke="var(--teal-dim)" stroke-width="0.75" stroke-dasharray="3 3" opacity="0.4"/>
+
+      <!-- Bar placeholders (evoke data fields on an SS card) -->
+      <rect x="25" y="660" width="60" height="10" rx="2" fill="var(--wave)" opacity="0.5"/>
+      <rect x="25" y="676" width="44" height="10" rx="2" fill="var(--wave)" opacity="0.35"/>
+      <rect x="25" y="692" width="52" height="10" rx="2" fill="var(--wave)" opacity="0.25"/>
+
+      <!-- Wave group 3: teal waves, bottom of column -->
+      <path d="M0,760 Q28,775 55,760 Q82,745 110,760 Q82,775 55,790 Q28,805 0,790 Z" fill="var(--wave)" opacity="0.9"/>
+      <path d="M0,800 Q28,815 55,800 Q82,785 110,800 Q82,815 55,830 Q28,845 0,830 Z" fill="var(--wave)" opacity="0.6"/>
+      <path d="M0,840 Q28,855 55,840 Q82,825 110,840 Q82,855 55,870 Q28,885 0,870 Z" fill="var(--wave)" opacity="0.35"/>
+    </svg>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       MAIN CONTENT AREA
+  ═══════════════════════════════════════════════════════ -->
+  <div class="main-content">
+
+    <header>
+      <div class="pill">2026 SSA Earnings Test</div>
+      <h2>Social Security Earnings Calculator</h2>
+      <p>Estimate your total pre-tax income if you collect Social Security
+         before full retirement age while still working.</p>
+      <!-- Opens the FAQ accordion modal -->
+      <button class="faq-btn" onclick="openModal('faq')">FAQ &amp; Help</button>
+    </header>
+
+    <!-- Decorative document-style bar that sits above the card -->
+    <div class="card-header-bar">
+      <span>Form SSA-EST-2026</span>
+      <span class="bar-dots">&#9679; &#9679; &#9679;</span>
+      <span>Earnings Estimation Tool</span>
+    </div>
+
+    <!-- ── Calculator card ──────────────────────────────────── -->
+    <div class="card">
+      <p class="section-label">Your information</p>
+
+      <!-- ── SCENARIO SELECTOR ─────────────────────────────────
+           Determines which SSA formula is applied:
+             continuing  → annual test, $1/$2, limit $24,480
+             fra_year    → annual test, $1/$3, limit $59,520,
+                           only wages before the FRA month counted
+             first_year  → monthly test, limit $2,040/month
+      ────────────────────────────────────────────────────────── -->
+      <div class="field">
+        <div class="field-header">
+          <label for="scenario">Your FRA scenario</label>
+          <button class="help-btn" onclick="openModal('scenario')" aria-label="Help: FRA scenario">?</button>
+        </div>
+        <select id="scenario" onchange="onScenarioChange()">
+          <option value="continuing">Continuing year (under FRA all year)</option>
+          <option value="fra_year">Year I reach FRA</option>
+          <option value="first_year">First year collecting SS</option>
+        </select>
+      </div>
+
+      <!-- Scenario description — text injected by onScenarioChange() -->
+      <div class="info-box" id="scenario-info"></div>
+
+      <!-- ── MONTHLY BENEFIT INPUT ──────────────────────────────
+           Gross monthly SS benefit entered by user.
+           Multiplied by 12 inside calculate() for the annual total.
+      ────────────────────────────────────────────────────────── -->
+      <div class="field">
+        <div class="field-header">
+          <label for="monthly">Monthly SS benefit</label>
+          <button class="help-btn" onclick="openModal('monthly')" aria-label="Help: Monthly SS benefit">?</button>
+        </div>
+        <div class="input-wrap">
+          <span class="prefix">$</span>
+          <input type="number" id="monthly" placeholder="0.00" min="0" oninput="calculate()" />
+        </div>
+      </div>
+
+      <!-- ── GROSS WAGES INPUT ──────────────────────────────────
+           Total gross annual wages from employment.
+           Excludes investment income, pensions, or SS itself.
+      ────────────────────────────────────────────────────────── -->
+      <div class="field">
+        <div class="field-header">
+          <label for="wages">Gross yearly wages</label>
+          <button class="help-btn" onclick="openModal('wages')" aria-label="Help: Gross yearly wages">?</button>
+        </div>
+        <div class="input-wrap">
+          <span class="prefix">$</span>
+          <input type="number" id="wages" placeholder="0.00" min="0" oninput="calculate()" />
+        </div>
+      </div>
+
+      <!-- ── FRA MONTH PICKER ───────────────────────────────────
+           Visible only for the "Year I reach FRA" scenario.
+           Wages from this month onward are excluded from the test.
+      ────────────────────────────────────────────────────────── -->
+      <div class="field month-field" id="fra-month-field">
+        <div class="field-header">
+          <label for="fra-month">Month you reach FRA</label>
+          <button class="help-btn" onclick="openModal('fra-month')" aria-label="Help: FRA month">?</button>
+        </div>
+        <p class="hint">Only wages earned before this month count toward the earnings test.</p>
+        <select id="fra-month" onchange="calculate()">
+          <option value="1">January</option>   <option value="2">February</option>
+          <option value="3">March</option>     <option value="4">April</option>
+          <option value="5">May</option>       <option value="6">June</option>
+          <option value="7">July</option>      <option value="8">August</option>
+          <option value="9">September</option> <option value="10">October</option>
+          <option value="11">November</option> <option value="12">December</option>
+        </select>
+      </div>
+
+      <!-- ── START MONTH PICKER ────────────────────────────────
+           Visible only for the "First year collecting" scenario.
+           Monthly test applies from this month onward.
+      ────────────────────────────────────────────────────────── -->
+      <div class="field month-field" id="first-month-field">
+        <div class="field-header">
+          <label for="start-month">Month you start collecting</label>
+          <button class="help-btn" onclick="openModal('start-month')" aria-label="Help: Start month">?</button>
+        </div>
+        <p class="hint">The monthly limit ($2,040) applies from your start month onward.</p>
+        <select id="start-month" onchange="calculate()">
+          <option value="1">January</option>   <option value="2">February</option>
+          <option value="3">March</option>     <option value="4">April</option>
+          <option value="5">May</option>       <option value="6">June</option>
+          <option value="7">July</option>      <option value="8">August</option>
+          <option value="9">September</option> <option value="10">October</option>
+          <option value="11">November</option> <option value="12">December</option>
+        </select>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- ── RESULTS SECTION ───────────────────────────────────
+           Hidden until at least one input is provided.
+           Result rows are built dynamically by calculate().
+      ────────────────────────────────────────────────────────── -->
+      <div class="results" id="results">
+        <p class="section-label">Breakdown</p>
+
+        <!-- Scenario-specific result rows injected by calculate() -->
+        <div id="result-rows"></div>
+
+        <!-- Shown only if the entire SS benefit is withheld -->
+        <div class="warning-box" id="warn-zero">
+          Your Social Security benefit is fully withheld at this income level.
+          You would receive $0 in SS benefits this year.
+        </div>
+
+        <!-- Grand total: wages + net SS after reduction -->
+        <div class="total-box">
+          <span class="tl">Total gross income</span>
+          <span class="tv" id="r-total"></span>
+        </div>
+      </div>
+
+      <!-- Shown before any inputs are entered -->
+      <div id="placeholder">Enter your information above to see results.</div>
+
+    </div><!-- /.card -->
+
+    <footer>
+      Based on the
+      <a href="https://www.ssa.gov/benefits/retirement/planner/whileworking.html" target="_blank">
+        SSA 2026 earnings test
+      </a>.
+      This tool is for estimation only — consult a financial advisor for personalized guidance.
+    </footer>
+
+  </div><!-- /.main-content -->
+
+  <!-- ═══════════════════════════════════════════════════════
+       RIGHT DECORATIVE COLUMN
+       Identical SVG artwork to the left column.
+       aria-hidden="true" so screen readers skip both columns.
+  ═══════════════════════════════════════════════════════ -->
+  <div class="col-side right" aria-hidden="true">
+    <svg class="col-art" viewBox="0 0 110 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0,60 Q28,75 55,60 Q82,45 110,60 Q82,75 55,90 Q28,105 0,90 Z"       fill="var(--wave)" opacity="0.9"/>
+      <path d="M0,100 Q28,115 55,100 Q82,85 110,100 Q82,115 55,130 Q28,145 0,130 Z" fill="var(--wave)" opacity="0.7"/>
+      <path d="M0,140 Q28,155 55,140 Q82,125 110,140 Q82,155 55,170 Q28,185 0,170 Z" fill="var(--wave)" opacity="0.5"/>
+      <path d="M0,180 Q28,195 55,180 Q82,165 110,180 Q82,195 55,210 Q28,225 0,210 Z" fill="var(--wave)" opacity="0.3"/>
+      <line x1="20" y1="260" x2="90" y2="260" stroke="var(--teal-dim)" stroke-width="0.75" stroke-dasharray="3 3" opacity="0.4"/>
+      <line x1="20" y1="275" x2="90" y2="275" stroke="var(--teal-dim)" stroke-width="0.75" stroke-dasharray="3 3" opacity="0.4"/>
+      <line x1="20" y1="290" x2="90" y2="290" stroke="var(--teal-dim)" stroke-width="0.75" stroke-dasharray="3 3" opacity="0.4"/>
+      <rect x="30" y="330" width="50" height="34" rx="4" fill="none" stroke="var(--teal-dim)" stroke-width="1" opacity="0.35"/>
+      <line x1="38" y1="341" x2="72" y2="341" stroke="var(--teal-dim)" stroke-width="0.75" opacity="0.3"/>
+      <line x1="38" y1="349" x2="65" y2="349" stroke="var(--teal-dim)" stroke-width="0.75" opacity="0.3"/>
+      <line x1="38" y1="357" x2="68" y2="357" stroke="var(--teal-dim)" stroke-width="0.75" opacity="0.3"/>
+      <circle cx="55" cy="420" r="22" fill="none" stroke="var(--gold-dim)" stroke-width="1"    stroke-dasharray="4 2" opacity="0.35"/>
+      <circle cx="55" cy="420" r="15" fill="none" stroke="var(--gold-dim)" stroke-width="0.75" opacity="0.25"/>
+      <line x1="55" y1="405" x2="55" y2="435" stroke="var(--gold-dim)" stroke-width="0.75" opacity="0.25"/>
+      <line x1="40" y1="420" x2="70" y2="420" stroke="var(--gold-dim)" stroke-width="0.75" opacity="0.25"/>
+      <path d="M10,490 Q55,500 100,490 Q55,510 10,500 Z" fill="var(--wave2)" opacity="0.8"/>
+      <path d="M10,508 Q55,518 100,508 Q55,528 10,518 Z" fill="var(--wave2)" opacity="0.6"/>
+      <path d="M10,526 Q55,536 100,526 Q55,546 10,536 Z" fill="var(--wave2)" opacity="0.4"/>
+      <line x1="20" y1="590" x2="90" y2="590" stroke="var(--teal-dim)" stroke-width="0.75" stroke-dasharray="3 3" opacity="0.4"/>
+      <line x1="20" y1="605" x2="90" y2="605" stroke="var(--teal-dim)" stroke-width="0.75" stroke-dasharray="3 3" opacity="0.4"/>
+      <line x1="20" y1="620" x2="90" y2="620" stroke="var(--teal-dim)" stroke-width="0.75" stroke-dasharray="3 3" opacity="0.4"/>
+      <rect x="25" y="660" width="60" height="10" rx="2" fill="var(--wave)" opacity="0.5"/>
+      <rect x="25" y="676" width="44" height="10" rx="2" fill="var(--wave)" opacity="0.35"/>
+      <rect x="25" y="692" width="52" height="10" rx="2" fill="var(--wave)" opacity="0.25"/>
+      <path d="M0,760 Q28,775 55,760 Q82,745 110,760 Q82,775 55,790 Q28,805 0,790 Z" fill="var(--wave)" opacity="0.9"/>
+      <path d="M0,800 Q28,815 55,800 Q82,785 110,800 Q82,815 55,830 Q28,845 0,830 Z" fill="var(--wave)" opacity="0.6"/>
+      <path d="M0,840 Q28,855 55,840 Q82,825 110,840 Q82,855 55,870 Q28,885 0,870 Z" fill="var(--wave)" opacity="0.35"/>
+    </svg>
+  </div>
+
+</div><!-- /.page-wrap -->
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ───────────────────────────────────────────────────────────
+     Sections in order:
+       1. HELP content    — all modal and FAQ text
+       2. Modal system    — open, close, FAQ accordion
+       3. Scenario logic  — show/hide month pickers + info text
+       4. Calculation     — three SSA formula implementations
+       5. Utilities       — number formatting, row builder
+       6. Initialization  — run on page load
+═══════════════════════════════════════════════════════════ -->
+<script>
+
+  /* ─────────────────────────────────────────────────────────
+     1. HELP CONTENT
+     Each key matches a field id or the string 'faq'.
+     openModal(key) reads this object and injects the HTML
+     into the shared modal element.
+     To edit help text or add FAQ items, change it here.
+  ───────────────────────────────────────────────────────── */
+  const HELP = {
+
+    scenario: {
+      title: 'Which scenario applies to you?',
+      body: `
+        <ul>
+          <li><strong>Continuing year</strong> — Under FRA for the entire
+              calendar year. The standard $1-for-$2 rule applies above $24,480.</li>
+          <li><strong>Year I reach FRA</strong> — You turn your full retirement
+              age sometime this year. A higher limit ($59,520) and gentler
+              $1-for-$3 penalty apply, but only for wages before your FRA month.</li>
+          <li><strong>First year collecting</strong> — First calendar year
+              receiving SS. A monthly limit of $2,040 applies instead of
+              the annual test.</li>
+        </ul>
+        <p style="margin-top:0.75rem;">
+          Unsure of your FRA? See the
+          <a href="https://www.ssa.gov/benefits/retirement/planner/agereduction.html"
+             target="_blank">SSA retirement age chart</a>.
+        </p>`
+    },
+
+    monthly: {
+      title: 'Your monthly SS benefit',
+      body: `
+        <p>Enter your gross monthly benefit before taxes or Medicare deductions.</p>
+        <p style="margin-top:0.6rem;">
+          Find it in your
+          <a href="https://www.ssa.gov/myaccount/" target="_blank">
+            my Social Security account</a>
+          or your SSA award letter.
+        </p>
+        <p style="margin-top:0.6rem;">
+          Do not reduce this number yourself — the calculator applies the
+          earnings-test reduction for you.
+        </p>`
+    },
+
+    wages: {
+      title: 'Gross yearly wages',
+      body: `
+        <p>Total gross (pre-tax) earnings from work: wages, salaries,
+           bonuses, and net self-employment income.</p>
+        <p style="margin-top:0.6rem;"><strong>Do not include:</strong></p>
+        <ul>
+          <li>Investment income or capital gains</li>
+          <li>Pension or annuity payments</li>
+          <li>Interest or dividend income</li>
+          <li>Social Security benefits themselves</li>
+        </ul>`
+    },
+
+    'fra-month': {
+      title: 'Month you reach full retirement age',
+      body: `
+        <p>Only earnings from January through the month <em>before</em> your
+           FRA month count toward the earnings test. Earnings from your FRA
+           month onward are ignored entirely.</p>
+        <p style="margin-top:0.6rem;">
+          Example: FRA in August means only January–July wages are counted.
+        </p>`
+    },
+
+    'start-month': {
+      title: 'Month you start collecting SS',
+      body: `
+        <p>In your first year, if you earn $2,040 or less in any month after
+           you start collecting, you receive full benefits for that month —
+           regardless of total annual wages.</p>
+        <p style="margin-top:0.6rem;">
+          This calculator estimates by spreading annual wages evenly across
+          12 months. Results may differ if income is uneven.
+        </p>`
+    },
+
+    /* FAQ — add, remove, or rewrite questions and answers here */
+    faq: {
+      title: 'Frequently asked questions',
+      isFaq: true,
+      items: [
+        {
+          q: 'What is the earnings test?',
+          a: 'The SSA temporarily withholds benefits if you collect before FRA and earn above the annual threshold. Benefits are not permanently lost — your monthly amount is recalculated upward at FRA to credit withheld months.'
+        },
+        {
+          q: 'Are withheld benefits gone forever?',
+          a: 'No. At FRA the SSA recalculates your benefit upward to credit months that were withheld. Most people break even or come out ahead over a long retirement.'
+        },
+        {
+          q: 'What counts as wages for the earnings test?',
+          a: 'Wages, salaries, bonuses, commissions, and net self-employment income. Investment income, pensions, interest, dividends, and rental income do not count.'
+        },
+        {
+          q: 'Does this apply after I reach FRA?',
+          a: 'No. Once you reach full retirement age you can earn any amount with no reduction to your Social Security benefit.'
+        },
+        {
+          q: 'Where can I find the official SSA rules?',
+          a: 'Visit the <a href="https://www.ssa.gov/benefits/retirement/planner/whileworking.html" target="_blank">SSA\'s official page on working while collecting</a>.'
+        }
+      ]
     }
 
-    function calculate() {
-      const monthly = parseFloat(document.getElementById('monthly').value) || 0;
-      const wages   = parseFloat(document.getElementById('wages').value)   || 0;
+  };
 
-      const results     = document.getElementById('results');
-      const placeholder = document.getElementById('placeholder');
 
-      if (!monthly && !wages) {
-        results.style.display     = 'none';
-        placeholder.style.display = 'block';
-        return;
-      }
+  /* ─────────────────────────────────────────────────────────
+     2. MODAL SYSTEM
 
-      const limit      = 24480;
-      const totalSS    = monthly * 12;
-      const excess     = Math.max(0, wages - limit);
-      const reduction  = excess / 2;
-      const netSS      = Math.max(0, totalSS - reduction);
-      const totalIncome = wages + netSS;
+     openModal(key)
+       Looks up the key in HELP, builds the HTML content,
+       and reveals the modal backdrop.
+       For isFaq keys it renders a collapsible accordion list.
+       For all other keys it renders body HTML + attribution footer.
 
-      document.getElementById('r-total-ss').textContent  = fmt(totalSS);
-      document.getElementById('r-excess').textContent    = fmt(excess);
-      document.getElementById('r-reduction').textContent = excess > 0 ? '-' + fmt(reduction) : fmt(0);
-      document.getElementById('r-net-ss').textContent    = fmt(netSS);
-      document.getElementById('r-total').textContent     = fmt(totalIncome);
+     closeModal(event)
+       Called when the user clicks on the backdrop element.
+       Checks that the click was on the backdrop itself (not
+       the inner modal box) before closing.
 
-      document.getElementById('warn-zero').style.display =
-        (netSS === 0 && totalSS > 0) ? 'block' : 'none';
+     closeAllModals()
+       Called by the X button — closes unconditionally.
 
-      results.style.display     = 'block';
-      placeholder.style.display = 'none';
+     toggleFaq(index)
+       Toggles open/closed state for a single FAQ item by
+       adding/removing the "open" CSS class on the question
+       and answer elements.
+  ───────────────────────────────────────────────────────── */
+
+  function openModal(key) {
+    const data = HELP[key];
+    if (!data) return;
+
+    let html = `<h3>${data.title}</h3>`;
+
+    if (data.isFaq) {
+      /* Build the accordion list for the FAQ modal */
+      html += data.items.map((item, i) => `
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(${i})" id="faq-q-${i}">
+            <span>${item.q}</span>
+            <span class="arrow">&#x25BC;</span>
+          </div>
+          <div class="faq-a" id="faq-a-${i}">${item.a}</div>
+        </div>`
+      ).join('');
+    } else {
+      /* Render field-help content with an SSA attribution footer */
+      html += data.body;
+      html += `<div class="modal-footer">
+        For official guidance visit
+        <a href="https://www.ssa.gov/benefits/retirement/planner/whileworking.html"
+           target="_blank">ssa.gov</a>.
+      </div>`;
     }
-  </script>
 
+    document.getElementById('modal-content').innerHTML = html;
+    document.getElementById('modal-backdrop').classList.add('open');
+  }
+
+  function toggleFaq(i) {
+    /* Rotate the chevron arrow and show/hide the answer */
+    document.getElementById('faq-q-' + i).classList.toggle('open');
+    document.getElementById('faq-a-' + i).classList.toggle('open');
+  }
+
+  function closeModal(event) {
+    /* Only close if click landed on the dark backdrop, not the modal box */
+    if (event.target === document.getElementById('modal-backdrop')) {
+      closeAllModals();
+    }
+  }
+
+  function closeAllModals() {
+    document.getElementById('modal-backdrop').classList.remove('open');
+  }
+
+
+  /* ─────────────────────────────────────────────────────────
+     3. SCENARIO LOGIC
+
+     SCENARIO_INFO holds the one-line description shown in the
+     teal info box inside the card when a scenario is selected.
+
+     onScenarioChange()
+       1. Reads the selected scenario value.
+       2. Updates and reveals the info box.
+       3. Shows/hides the correct month picker(s).
+       4. Calls calculate() so results stay current.
+  ───────────────────────────────────────────────────────── */
+
+  const SCENARIO_INFO = {
+    continuing: 'Standard rule: $1 withheld per $2 earned above $24,480. Applies if you are under FRA the entire year.',
+    fra_year:   'FRA-year rule: $1 withheld per $3 earned above $59,520. Only wages before your FRA month count.',
+    first_year: 'First-year rule: monthly limit of $2,040 applies. Earn at or below that in any month after you start and you receive full benefits for that month.'
+  };
+
+  function onScenarioChange() {
+    const sc   = document.getElementById('scenario').value;
+    const info = document.getElementById('scenario-info');
+
+    /* Update and reveal the scenario description box */
+    info.textContent   = SCENARIO_INFO[sc];
+    info.style.display = 'block';
+
+    /* FRA month picker: only needed for the FRA-year scenario */
+    document.getElementById('fra-month-field').style.display =
+      (sc === 'fra_year') ? 'block' : 'none';
+
+    /* Start month picker: only needed for the first-year scenario */
+    document.getElementById('first-month-field').style.display =
+      (sc === 'first_year') ? 'block' : 'none';
+
+    calculate();
+  }
+
+
+  /* ─────────────────────────────────────────────────────────
+     4. CALCULATION ENGINE
+
+     calculate()
+       Reads the current inputs, applies the correct SSA formula
+       for the selected scenario, and writes the results to the DOM.
+
+     ── SCENARIO A: Continuing year (full year under FRA) ──
+       Earnings limit : $24,480
+       Excess         : wages − limit  (minimum 0)
+       Reduction      : excess ÷ 2     ($1 withheld per $2 excess)
+       Net SS         : (monthly × 12) − reduction  (minimum 0)
+       Total income   : wages + netSS
+
+     ── SCENARIO B: Year reaching FRA ──
+       Earnings limit : $59,520
+       Counted wages  : wages × (fraMonth − 1) ÷ 12
+                        Only months BEFORE the FRA month count.
+                        Example: FRA in month 8 → 7/12 of wages counted.
+       Excess         : countedWages − limit  (minimum 0)
+       Reduction      : excess ÷ 3     ($1 withheld per $3 excess)
+       Net SS         : (monthly × 12) − reduction  (minimum 0)
+       Total income   : wages + netSS
+
+     ── SCENARIO C: First year collecting ──
+       Monthly limit    : $2,040
+       Months collecting: 13 − startMonth
+                          (e.g. starting in March = 13 − 3 = 10 months)
+       Monthly wages    : wages ÷ 12  (assumes even distribution)
+       If monthly wages > $2,040:
+         All collecting months are withheld.
+         Months received = 12 − monthsCollecting
+       Else:
+         No months withheld; full year of benefits paid.
+       Net SS           : monthly × monthsReceived
+       Total income     : wages + netSS
+
+     NOTE: Scenario C is a simplification. The actual SSA rule evaluates
+     each month individually. This calculator assumes wages are evenly
+     distributed throughout the year.
+  ───────────────────────────────────────────────────────── */
+
+  function calculate() {
+    const monthly = parseFloat(document.getElementById('monthly').value) || 0;
+    const wages   = parseFloat(document.getElementById('wages').value)   || 0;
+    const sc      = document.getElementById('scenario').value;
+    const results = document.getElementById('results');
+    const ph      = document.getElementById('placeholder');
+
+    /* If both fields are empty, reset to the placeholder state */
+    if (!monthly && !wages) {
+      results.style.display = 'none';
+      ph.style.display      = 'block';
+      return;
+    }
+
+    const totalSS = monthly * 12; /* Gross annual SS before any reduction */
+    let rows      = '';
+    let netSS, reduction, excess;
+
+    /* ── Scenario A ── */
+    if (sc === 'continuing') {
+      const LIMIT = 24480;
+
+      excess    = Math.max(0, wages - LIMIT);
+      reduction = excess / 2;
+      netSS     = Math.max(0, totalSS - reduction);
+
+      rows += buildRow('Total SS in one year',                fmt(totalSS));
+      rows += buildRow('2026 earnings limit',                 '$24,480');
+      rows += buildRow('Excess earnings',                     fmt(excess));
+      rows += buildRow('Benefit reduction ($1 per $2 excess)',
+                       excess > 0 ? '\u2212' + fmt(reduction) : fmt(0), excess > 0);
+      rows += buildRow('SS benefit after reduction',          fmt(netSS));
+
+    /* ── Scenario B ── */
+    } else if (sc === 'fra_year') {
+      const LIMIT    = 59520;
+      const fraMonth = parseInt(document.getElementById('fra-month').value);
+
+      /* Months before FRA month: e.g. FRA in August (8) → 7 months */
+      const monthsBefore = fraMonth - 1;
+      const countedWages = (monthsBefore / 12) * wages;
+
+      excess    = Math.max(0, countedWages - LIMIT);
+      reduction = excess / 3;
+      netSS     = Math.max(0, totalSS - reduction);
+
+      rows += buildRow('Total SS in one year',                      fmt(totalSS));
+      rows += buildRow('2026 FRA-year earnings limit',              '$59,520');
+      rows += buildRow('Wages counted (' + monthsBefore + ' months before FRA)', fmt(countedWages));
+      rows += buildRow('Excess earnings',                           fmt(excess));
+      rows += buildRow('Benefit reduction ($1 per $3 excess)',
+                       excess > 0 ? '\u2212' + fmt(reduction) : fmt(0), excess > 0);
+      rows += buildRow('SS benefit after reduction',                fmt(netSS));
+
+    /* ── Scenario C ── */
+    } else if (sc === 'first_year') {
+      const MONTHLY_LIMIT  = 2040;
+      const startMonth     = parseInt(document.getElementById('start-month').value);
+
+      /* Total months the person collects SS (startMonth through December) */
+      const monthsCollecting = 13 - startMonth;
+
+      /* Assume wages are spread evenly: annual ÷ 12 = monthly estimate */
+      const monthlyWages = wages / 12;
+
+      /*
+        If estimated monthly wages exceed the limit, every collecting month
+        is withheld. If not, no months are withheld and full benefits are paid.
+        (Simplified: the actual SSA rule checks each month individually.)
+      */
+      const monthsWithheld = (monthlyWages > MONTHLY_LIMIT) ? monthsCollecting : 0;
+      const monthsReceived = 12 - monthsWithheld;
+
+      netSS     = monthly * monthsReceived;
+      reduction = totalSS - netSS;
+
+      rows += buildRow('Total SS if no penalty',     fmt(totalSS));
+      rows += buildRow('Monthly earnings limit',     '$2,040');
+      rows += buildRow('Estimated monthly wages',    fmt(monthlyWages));
+      rows += buildRow('Months collecting SS',       monthsCollecting);
+      rows += buildRow('Months benefits paid',       monthsReceived);
+      rows += buildRow('SS benefit after reduction', fmt(netSS), reduction > 0);
+    }
+
+    /* ── Write results to the DOM ── */
+    const totalIncome = wages + netSS;
+
+    document.getElementById('result-rows').innerHTML = rows;
+    document.getElementById('r-total').textContent   = fmt(totalIncome);
+
+    /* Show the zero-benefit warning only when SS is fully withheld */
+    document.getElementById('warn-zero').style.display =
+      (netSS === 0 && totalSS > 0) ? 'block' : 'none';
+
+    results.style.display = 'block';
+    ph.style.display      = 'none';
+  }
+
+
+  /* ─────────────────────────────────────────────────────────
+     5. UTILITY FUNCTIONS
+
+     fmt(n)
+       Formats a number as a US dollar string with commas.
+       e.g. 24480 → "$24,480"
+       Math.round() prevents floating-point artifacts like
+       "$24,479.99999" from appearing in the UI.
+
+     buildRow(label, value, isNegative)
+       Returns one result-row HTML string.
+       Pass isNegative = true to apply the red "negative" class.
+  ───────────────────────────────────────────────────────── */
+
+  function fmt(n) {
+    return '$' + Math.round(n).toLocaleString('en-US');
+  }
+
+  function buildRow(label, value, isNeg) {
+    const cls = isNeg ? ' negative' : '';
+    return `<div class="result-row">
+      <span class="result-label">${label}</span>
+      <span class="result-value${cls}">${value}</span>
+    </div>`;
+  }
+
+
+  /* ─────────────────────────────────────────────────────────
+     6. INITIALIZATION
+     Run onScenarioChange() immediately on page load so the
+     info box and month-picker visibility match the default
+     scenario ("continuing") before the user touches anything.
+  ───────────────────────────────────────────────────────── */
+  onScenarioChange();
+
+</script>
 </body>
 </html>
