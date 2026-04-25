@@ -3,7 +3,75 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Social Security Earnings Calculator 2026</title>
+  <title>Social Security Earnings Calculator 2026 by AlgorithmDoc.Com</title>
+
+  <!--
+  ── CONTENT SECURITY POLICY (CSP) ───────────────────────────
+  This header tells the browser what resources it is allowed
+  to load. Any resource not on this list is blocked outright,
+  protecting users from injected scripts, tracking pixels,
+  or malicious content.
+
+  Directives explained:
+    default-src 'none'
+      Block everything by default unless explicitly allowed below.
+
+    script-src 'self' 'unsafe-inline'
+      Allow only scripts that are part of this file ('self') or
+      written inline in the HTML ('unsafe-inline'). No external
+      scripts from other domains are permitted.
+      NOTE: If you add Google Analytics or AdSense in the future,
+      you will need to add their domains here, e.g.:
+        https://www.googletagmanager.com
+        https://pagead2.googlesyndication.com
+
+    style-src 'self' 'unsafe-inline'
+      Allow only styles embedded in this file. No external
+      stylesheets from other domains.
+
+    img-src 'self' data:
+      Allow images that are part of this file, or inline
+      base64-encoded images (data: URIs). No external images.
+
+    font-src 'none'
+      No external fonts permitted. (This app uses system fonts only.)
+      NOTE: If you add Google Fonts in the future, add:
+        https://fonts.gstatic.com
+
+    connect-src 'none'
+      No outbound network requests (fetch, XHR, WebSockets).
+      The calculator runs entirely in the browser.
+
+    frame-src 'none'
+      Prevent this page from being embedded in an iframe on
+      another site, which can be used for clickjacking attacks.
+
+    object-src 'none'
+      Block Flash, Java applets, and other plugin-based content.
+
+    base-uri 'self'
+      Prevent attackers from changing the base URL of the page.
+
+    form-action 'none'
+      No form submissions to external URLs. (This app has no forms.)
+
+  FUTURE-PROOFING NOTE:
+    When you add Google Analytics, update script-src and connect-src.
+    When you add AdSense, update script-src and frame-src.
+    I can help you update this when the time comes.
+  ───────────────────────────────────────────────────────────── -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src  'none';
+    script-src   'self' 'unsafe-inline';
+    style-src    'self' 'unsafe-inline';
+    img-src      'self' data:;
+    font-src     'none';
+    connect-src  'none';
+    frame-src    'none';
+    object-src   'none';
+    base-uri     'self';
+    form-action  'none';
+  " />
 
   <!--
   ============================================================
@@ -20,9 +88,15 @@
     2. Year reaching FRA — Reaches FRA sometime during the year.
                            Rule: $1 withheld per $3 earned over $59,520,
                            counting only wages before the FRA month.
-    3. First year collecting — First calendar year receiving SS.
-                           Rule: Monthly earnings test of $2,040/month
-                           rather than the annual test.
+    3. First year collecting — First calendar year receiving Social Security.
+                           Rule: Monthly earnings test of $2,040/month.
+                           User selects start month, indicates whether
+                           FRA falls this same year, then checks off
+                           each month they expect to earn $2,040 or less.
+                           Hybrid case (first year + FRA this year) is
+                           handled: monthly test stops at FRA month,
+                           full benefits paid automatically after that. 
+                           Special rules apply to self-employment income. We will apply those later.
 
   DESIGN:
     - Light/dark mode auto-detection via CSS prefers-color-scheme.
@@ -145,7 +219,7 @@
       top: 0; left: 0;
       width: 100%; height: 100%;
     }
-
+    /* This app built by Carolyn Coughlin McDonough, Kyle Jack Weissberg, and Claude AI. All rights reserved 2026 - 2030. */
     /* ── Main content area ──────────────────────────────────── */
     .main-content {
       flex: 1;
@@ -341,10 +415,139 @@
 
     /* ── Month pickers (conditionally visible) ──────────────────
        Hidden by default. JavaScript shows them based on scenario:
-         #fra-month-field   → visible for "Year I reach FRA"
-         #first-month-field → visible for "First year collecting"
+         #fra-month-field      → visible for "Year I reach FRA"
+         #first-month-field    → visible for "First year collecting"
+         #fra-this-year-field  → visible for "First year collecting"
+         #month-checklist-field→ visible after start month chosen
     ─────────────────────────────────────────────────────────── */
     .month-field { display: none; }
+
+    /* ── NEW IN THIS VERSION: First Year Collecting UI ──────────
+       The following CSS blocks support the new month-by-month
+       earnings test feature for the "First Year Collecting
+       Social Security Retirement Benefits" scenario.
+       Elements added:
+         .radio-group        — Yes/No buttons for FRA-this-year question
+         .month-grid         — 3-column checklist of months
+         .month-cell         — individual month checkbox tile
+         .checklist-legend   — color key below the checklist
+         .hybrid-note        — gold warning box for hybrid year case
+    ─────────────────────────────────────────────────────────── */
+
+    /* ── Yes/No radio button group (FRA this year question) ─────── */
+    .radio-group {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 0.25rem;
+    }
+
+    .radio-group label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1.1rem;
+      font-weight: normal;
+      color: var(--text);
+      cursor: pointer;
+      font-family: Arial, sans-serif;
+    }
+
+    .radio-group input[type=radio] {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--teal);
+      cursor: pointer;
+    }
+
+    /* ── Month checklist grid ─────────────────────────────────────
+       3-column grid of month cells. Each cell has a checkbox.
+       Checked (green border) = user expects to earn under $2,040
+       that month → full SS benefit paid for that month.
+       Unchecked = over limit → benefit withheld that month.
+       Disabled (faded) = months before start or after FRA month.
+    ─────────────────────────────────────────────────────────── */
+    .month-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.6rem;
+      margin-top: 0.75rem;
+    }
+
+    .month-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0.55rem 0.75rem;
+      border-radius: 6px;
+      border: 1.5px solid var(--input-border);
+      background: var(--input-bg);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      font-family: Arial, sans-serif;
+      font-size: 1rem;
+      color: var(--text-dim);
+      user-select: none;
+    }
+
+    /* Green highlight when month is checked (under the limit) */
+    .month-cell.checked {
+      border-color: var(--teal-dim);
+      background: var(--info-bg);
+      color: var(--text);
+    }
+
+    /* Grayed out for months outside the collecting window */
+    .month-cell.disabled {
+      opacity: 0.28;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .month-cell input[type=checkbox] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--teal);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* Legend key below the checklist */
+    .checklist-legend {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 0.75rem;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      font-family: Arial, sans-serif;
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+
+    .legend-swatch {
+      width: 14px; height: 14px;
+      border-radius: 3px;
+      border: 1.5px solid var(--input-border);
+      flex-shrink: 0;
+    }
+
+    .legend-swatch.checked {
+      background: var(--info-bg);
+      border-color: var(--teal-dim);
+    }
+
+    /* Gold note box for the hybrid first-year + FRA-same-year case */
+    .hybrid-note {
+      display: none;
+      background: rgba(212,168,67,0.1);
+      border-left: 4px solid var(--gold-dim);
+      border-radius: 0 6px 6px 0;
+      padding: 0.9rem 1.1rem;
+      font-size: 0.95rem;
+      color: var(--text-dim);
+      margin-top: 1rem;
+      line-height: 1.7;
+      font-family: Arial, sans-serif;
+    }
 
     /* ── Divider between inputs and results ─────────────────── */
     .divider {
@@ -699,8 +902,8 @@
     <header>
       <div class="pill">2026 SSA Earnings Test</div>
       <h2>Social Security Earnings Calculator</h2>
-      <p>Estimate your total pre-tax income if you collect Social Security
-         before full retirement age while still working.</p>
+      <p>Estimate your total pre-tax income if you wish to keep working while collecting Social Security Retirement Benefits
+         prior to your Full Retirement Age (FRA).</p>
       <!-- Opens the FAQ accordion modal -->
       <button class="faq-btn" onclick="openModal('faq')">FAQ &amp; Help</button>
     </header>
@@ -725,13 +928,13 @@
       ────────────────────────────────────────────────────────── -->
       <div class="field">
         <div class="field-header">
-          <label for="scenario">Your FRA scenario</label>
+          <label for="scenario">Please select the appropriate scenario: </label>
           <button class="help-btn" onclick="openModal('scenario')" aria-label="Help: FRA scenario">?</button>
         </div>
         <select id="scenario" onchange="onScenarioChange()">
-          <option value="continuing">Continuing year (under FRA all year)</option>
-          <option value="fra_year">Year I reach FRA</option>
-          <option value="first_year">First year collecting SS</option>
+            <option value="first_year">This is my first year collecting Social Security</option>
+            <option value="continuing">I started collecting Social Security prior to this calendar year </option>
+            <option value="fra_year">I will reach FRA this year</option>
         </select>
       </div>
 
@@ -744,7 +947,7 @@
       ────────────────────────────────────────────────────────── -->
       <div class="field">
         <div class="field-header">
-          <label for="monthly">Monthly SS benefit</label>
+          <label for="monthly">Monthly Social Security Benefit</label>
           <button class="help-btn" onclick="openModal('monthly')" aria-label="Help: Monthly SS benefit">?</button>
         </div>
         <div class="input-wrap">
@@ -790,15 +993,15 @@
 
       <!-- ── START MONTH PICKER ────────────────────────────────
            Visible only for the "First year collecting" scenario.
-           Monthly test applies from this month onward.
+           The monthly earnings test applies from this month onward.
       ────────────────────────────────────────────────────────── -->
       <div class="field month-field" id="first-month-field">
         <div class="field-header">
           <label for="start-month">Month you start collecting</label>
           <button class="help-btn" onclick="openModal('start-month')" aria-label="Help: Start month">?</button>
         </div>
-        <p class="hint">The monthly limit ($2,040) applies from your start month onward.</p>
-        <select id="start-month" onchange="calculate()">
+        <p class="hint">The monthly earnings test ($2,040 limit) applies from this month through December — or through your FRA month if you reach FRA this year.</p>
+        <select id="start-month" onchange="onStartMonthChange()">
           <option value="1">January</option>   <option value="2">February</option>
           <option value="3">March</option>     <option value="4">April</option>
           <option value="5">May</option>       <option value="6">June</option>
@@ -806,6 +1009,85 @@
           <option value="9">September</option> <option value="10">October</option>
           <option value="11">November</option> <option value="12">December</option>
         </select>
+      </div>
+
+      <!-- ── DO YOU REACH FRA THIS YEAR? ───────────────────────
+           Shown after start month is selected (first year only).
+           If YES, a second dropdown asks which month FRA falls in.
+           This creates the hybrid scenario: monthly test applies
+           from start month up to (but not including) FRA month,
+           then no earnings test applies from FRA month onward.
+      ────────────────────────────────────────────────────────── -->
+      <div class="field month-field" id="fra-this-year-field">
+        <div class="field-header">
+          <label>Do you reach Full Retirement Age this same year?</label>
+          <button class="help-btn" onclick="openModal('fra-this-year')" aria-label="Help: FRA this year">?</button>
+        </div>
+        <div class="radio-group">
+          <label>
+            <input type="radio" name="fra-this-year" value="no" checked onchange="onFraThisYearChange()" />
+            No — I am under FRA all year
+          </label>
+          <label>
+            <input type="radio" name="fra-this-year" value="yes" onchange="onFraThisYearChange()" />
+            Yes — I reach FRA this year
+          </label>
+        </div>
+
+        <!-- FRA month sub-picker: shown only when "Yes" is selected -->
+        <div id="fra-this-year-month-wrap" style="display:none; margin-top:1rem;">
+          <p class="hint">Select the month you reach FRA. The earnings test only applies to months before this one.</p>
+          <select id="fra-this-year-month" onchange="buildMonthChecklist(); calculate()">
+            <option value="1">January</option>   <option value="2">February</option>
+            <option value="3">March</option>     <option value="4">April</option>
+            <option value="5">May</option>       <option value="6">June</option>
+            <option value="7">July</option>      <option value="8">August</option>
+            <option value="9">September</option> <option value="10">October</option>
+            <option value="11">November</option> <option value="12">December</option>
+          </select>
+          <!-- Gold note explaining the hybrid calculation -->
+          <div class="hybrid-note" id="hybrid-note">
+            &#9888; <strong>Hybrid year:</strong> The monthly earnings test ($2,040/month)
+            applies only from your start month through the month <em>before</em> you reach FRA.
+            From your FRA month onward, there is no earnings test and you receive full Social Security benefits
+            regardless of wages. This calculator handles both periods separately. 
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MONTH-BY-MONTH EARNINGS CHECKLIST ─────────────────
+           Shown after start month (and FRA question) are answered.
+           Displays only the months in the earnings-test window.
+           User checks each month where they expect to earn
+           $2,040 or LESS — those months get full SS paid.
+           Unchecked months = over limit → SS withheld that month.
+      ────────────────────────────────────────────────────────── -->
+      <div class="field month-field" id="month-checklist-field">
+        <div class="field-header">
+          <label>Which months will you earn $2,040 or less?</label>
+          <button class="help-btn" onclick="openModal('month-checklist')" aria-label="Help: Monthly checklist">?</button>
+        </div>
+        <p class="hint">
+            Check each month where you expect your wages to be <strong>$2,040 or less</strong>.
+            You will receive your full Social Security benefit for those months.
+            Leave a month unchecked if you expect to earn more — your benefit will be withheld that month.
+            Please refer to href="https://www.ssa.gov/benefits/retirement/planner/rule.html" if you are self-employed.
+        </p>
+
+        <!-- Grid is built dynamically by buildMonthChecklist() -->
+        <div class="month-grid" id="month-grid"></div>
+
+        <!-- Visual legend -->
+        <div class="checklist-legend">
+          <div class="legend-item">
+            <div class="legend-swatch checked"></div>
+            <span>Under $2,040 — full benefit paid</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-swatch"></div>
+            <span>Over $2,040 — benefit withheld</span>
+          </div>
+        </div>
       </div>
 
       <hr class="divider" />
@@ -823,7 +1105,7 @@
         <!-- Shown only if the entire SS benefit is withheld -->
         <div class="warning-box" id="warn-zero">
           Your Social Security benefit is fully withheld at this income level.
-          You would receive $0 in SS benefits this year.
+          You would receive $0 in benefits this year.
         </div>
 
         <!-- Grand total: wages + net SS after reduction -->
@@ -834,7 +1116,7 @@
       </div>
 
       <!-- Shown before any inputs are entered -->
-      <div id="placeholder">Enter your information above to see results.</div>
+      <div id="placeholder">AlgorithmDoc created this application for demo purposes, using Claude.AI. No values are collected. Please validate results with a certified financial expert, and with the official Social Security government site.</div>
 
     </div><!-- /.card -->
 
@@ -931,14 +1213,14 @@
     },
 
     monthly: {
-      title: 'Your monthly SS benefit',
+      title: 'Your monthly Social Security benefit',
       body: `
-        <p>Enter your gross monthly benefit before taxes or Medicare deductions.</p>
+        <p>Enter your gross monthly benefit before taxes or Medicare deductions. This amount depends on when you elect to start collecting Social Security.</p>
         <p style="margin-top:0.6rem;">
           Find it in your
           <a href="https://www.ssa.gov/myaccount/" target="_blank">
             my Social Security account</a>
-          or your SSA award letter.
+          or your SSA award letter. 
         </p>
         <p style="margin-top:0.6rem;">
           Do not reduce this number yourself — the calculator applies the
@@ -957,35 +1239,83 @@
           <li>Pension or annuity payments</li>
           <li>Interest or dividend income</li>
           <li>Social Security benefits themselves</li>
+          <li>Unemployment benefits (in most states)<li>
         </ul>`
     },
 
     'fra-month': {
-      title: 'Month you reach full retirement age',
+      title: 'Month you reach full retirement age (FRA)',
       body: `
         <p>Only earnings from January through the month <em>before</em> your
            FRA month count toward the earnings test. Earnings from your FRA
-           month onward are ignored entirely.</p>
+           month onward are ignored entirely. /p>
         <p style="margin-top:0.6rem;">
           Example: FRA in August means only January–July wages are counted.
         </p>`
     },
 
     'start-month': {
-      title: 'Month you start collecting SS',
+      title: 'Month you start collecting Social Security',
       body: `
-        <p>In your first year, if you earn $2,040 or less in any month after
-           you start collecting, you receive full benefits for that month —
-           regardless of total annual wages.</p>
+        <p>In your first year, the SSA uses a month-by-month earnings test
+           rather than the annual one.</p>
         <p style="margin-top:0.6rem;">
-          This calculator estimates by spreading annual wages evenly across
-          12 months. Results may differ if income is uneven.
+          For each month after you start collecting, if your wages are
+          $2,040 or less, you receive your full Social Security benefit for that month —
+          regardless of your total annual wages. There are special limits for self-employment income. 
+        </p>
+        <p style="margin-top:0.6rem;">
+          After you select your start month, you will be able to check off
+          each month where you expect to earn $2,040 or less.
+        </p>`
+    },
+
+    'fra-this-year': {
+      title: 'Do you reach FRA this same year?',
+      body: `
+        <p>This is an important question because it creates a <strong>hybrid year</strong>.</p>
+        <p style="margin-top:0.6rem;">
+          If you reach Full Retirement Age (FRA) during the same calendar year
+          you start collecting, two different rules apply in the same year:
+        </p>
+        <ul style="margin-top:0.5rem;">
+          <li>From your <strong>start month through the month before FRA</strong>:
+              the monthly earnings test applies ($2,040/month limit).</li>
+          <li>From your <strong>FRA month onward</strong>:
+              no earnings test at all — you receive full benefits
+              regardless of how much you earn.</li>
+        </ul>
+        <p style="margin-top:0.6rem;">
+          If you are not sure of your FRA month, check the
+          <a href="https://www.ssa.gov/benefits/retirement/planner/agereduction.html"
+             target="_blank">SSA retirement age chart</a>.
+        </p>`
+    },
+
+    'month-checklist': {
+      title: 'Monthly earnings checklist',
+      body: `
+        <p>The SSA's first-year rule evaluates your earnings
+           <strong>one month at a time</strong>.</p>
+        <p style="margin-top:0.6rem;">
+          For each month in the checklist, check it if you expect your wages
+          to be <strong>$2,040 or less</strong> that month.
+          You will receive your full benefit for every checked month.
+        </p>
+        <p style="margin-top:0.6rem;">
+          Leave a month unchecked if you expect to earn more than $2,040 —
+          your benefit will be withheld for that month.
+        </p>
+        <p style="margin-top:0.6rem;">
+          Only the months in your earnings-test window are shown — from your
+          start month through December (or through the month before your FRA,
+          if you reach FRA this year).
         </p>`
     },
 
     /* FAQ — add, remove, or rewrite questions and answers here */
     faq: {
-      title: 'Frequently asked questions',
+      title: 'Frequently Asked Questions',
       isFaq: true,
       items: [
         {
@@ -998,17 +1328,37 @@
         },
         {
           q: 'What counts as wages for the earnings test?',
-          a: 'Wages, salaries, bonuses, commissions, and net self-employment income. Investment income, pensions, interest, dividends, and rental income do not count.'
-        },
+          a: 'Wages, salaries, bonuses, commissions, and net self-employment income. Investment income, pensions, interest, dividends, and rental income do not count. In most states, unemployment benefits do not count.'
+          },
+          {
+              q: 'Are social security benefits taxable?',
+              a: 'They might be taxable, whether you receive them after reaching FRA or prior to this. Please consult your accountant.'
+          },
         {
-          q: 'Does this apply after I reach FRA?',
-          a: 'No. Once you reach full retirement age you can earn any amount with no reduction to your Social Security benefit.'
+          q: 'Do benefits get reduced based on earnings apply after I reach FRA?',
+          a: 'No. Once you reach FRA you can earn any amount with no reduction to your Social Security benefit.'
         },
         {
           q: 'Where can I find the official SSA rules?',
           a: 'Visit the <a href="https://www.ssa.gov/benefits/retirement/planner/whileworking.html" target="_blank">SSA\'s official page on working while collecting</a>.'
-        }
-      ]
+        },
+        {
+           q: 'How does self-employment impact these amounts?',
+            a: 'Visit the <a href="https://www.ssa.gov/benefits/retirement/planner/rule.html" target="_blank">SSA\'s discussion of self-employment income and your first year collecting benefits.</a>.'
+          },
+          {
+              q: 'Can I change my mind,suspend payment, and restart collecting benefits later? ',
+              a: 'Visit the <a href="https://www.ssa.gov/benefits/retirement/planner/suspend.html" target="_blank">SSA\'s discussion of what to do if you change your mind about the date you first collect social security.</a>.'
+          },
+          {
+              q: 'How much is deducted from my total if I am 65 and I wish to have Medicare Parts A, B, C, or D?',
+              a: 'Visit the <a href="https://www.ssa.gov/benefits/medicare/medicare-premiums.html" target="_blank">SSA\'s discussion of medicare-related deductions to help you plan.</a>.'
+          },
+          {
+              q: 'What if I currently live outside of the United States but I have previously contributed to Social Security?',
+              a: 'Visit the <a href="https://www.ssa.gov/international/index.html" target="_blank">SSA\'s discussion for International Recipients.</a>.'
+          },
+          ]
     }
 
   };
@@ -1102,7 +1452,7 @@
   const SCENARIO_INFO = {
     continuing: 'Standard rule: $1 withheld per $2 earned above $24,480. Applies if you are under FRA the entire year.',
     fra_year:   'FRA-year rule: $1 withheld per $3 earned above $59,520. Only wages before your FRA month count.',
-    first_year: 'First-year rule: monthly limit of $2,040 applies. Earn at or below that in any month after you start and you receive full benefits for that month.'
+    first_year: 'First-year rule: the SSA tests your earnings month by month ($2,040 limit). You receive full benefits for any month you earn $2,040 or less, regardless of your annual total.'
   };
 
   function onScenarioChange() {
@@ -1117,10 +1467,124 @@
     document.getElementById('fra-month-field').style.display =
       (sc === 'fra_year') ? 'block' : 'none';
 
-    /* Start month picker: only needed for the first-year scenario */
+    /* First-year fields: start month + FRA-this-year question */
+    const isFirstYear = (sc === 'first_year');
     document.getElementById('first-month-field').style.display =
-      (sc === 'first_year') ? 'block' : 'none';
+      isFirstYear ? 'block' : 'none';
+    document.getElementById('fra-this-year-field').style.display =
+      isFirstYear ? 'block' : 'none';
 
+    /* Hide checklist until start month triggers it */
+    if (!isFirstYear) {
+      document.getElementById('month-checklist-field').style.display = 'none';
+    }
+
+    calculate();
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     Called when the start month dropdown changes.
+     Rebuilds the month checklist and recalculates.
+  ───────────────────────────────────────────────────────── */
+  function onStartMonthChange() {
+    buildMonthChecklist();
+    calculate();
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     Called when the "FRA this year" radio buttons change.
+     Shows/hides the FRA month sub-picker and hybrid note,
+     then rebuilds the checklist.
+  ───────────────────────────────────────────────────────── */
+  function onFraThisYearChange() {
+    const fraThisYear = document.querySelector('input[name="fra-this-year"]:checked').value === 'yes';
+    const wrap        = document.getElementById('fra-this-year-month-wrap');
+    wrap.style.display = fraThisYear ? 'block' : 'none';
+    document.getElementById('hybrid-note').style.display = fraThisYear ? 'block' : 'none';
+    buildMonthChecklist();
+    calculate();
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     buildMonthChecklist()
+     Determines the window of months subject to the earnings
+     test and renders a 3-column grid of checkbox cells.
+
+     Window logic:
+       Start  = the month the user starts collecting (1–12)
+       End    = December (12) normally
+                OR fraMonth − 1 if FRA falls this year
+                (the FRA month itself has no earnings test)
+
+     Each cell toggles its "checked" state on click and
+     calls calculate() to update results immediately.
+  ───────────────────────────────────────────────────────── */
+  const MONTH_NAMES = [
+    'January','February','March','April','May','June',
+    'July','August','September','October','November','December'
+  ];
+
+  function buildMonthChecklist() {
+    const startMonth  = parseInt(document.getElementById('start-month').value);
+    const fraThisYear = document.querySelector('input[name="fra-this-year"]:checked').value === 'yes';
+    const fraMonth    = fraThisYear
+      ? parseInt(document.getElementById('fra-this-year-month').value)
+      : 13; /* 13 = no FRA cutoff, test runs through December */
+
+    /*
+      The earnings-test window is startMonth through min(12, fraMonth−1).
+      Example: start=March(3), FRA=October(10) → window is March–September (3–9).
+      Example: start=June(6), no FRA → window is June–December (6–12).
+    */
+    const testEnd = Math.min(12, fraMonth - 1);
+
+    const grid = document.getElementById('month-grid');
+    grid.innerHTML = '';
+
+    for (let m = 1; m <= 12; m++) {
+      const inWindow  = (m >= startMonth && m <= testEnd);
+      const afterFRA  = fraThisYear && m >= fraMonth;
+      const cell      = document.createElement('div');
+      cell.className  = 'month-cell' + (inWindow ? '' : ' disabled');
+      cell.dataset.month = m;
+
+      /* Months after FRA get a special label since no test applies */
+      const sublabel = afterFRA
+        ? '<span style="font-size:0.7rem;color:var(--teal);display:block;">No test (post-FRA)</span>'
+        : '';
+
+      cell.innerHTML = `
+        <input type="checkbox" id="mc-${m}" ${inWindow ? '' : 'disabled tabindex="-1"'} onchange="onMonthCheck(${m})" />
+        <span>${MONTH_NAMES[m-1]}${sublabel}</span>`;
+
+      /* Clicking anywhere on the cell toggles the checkbox */
+      cell.addEventListener('click', function(e) {
+        if (e.target.tagName !== 'INPUT') {
+          const cb = this.querySelector('input');
+          cb.checked = !cb.checked;
+          onMonthCheck(parseInt(this.dataset.month));
+        }
+      });
+
+      grid.appendChild(cell);
+    }
+
+    /* Show the checklist section */
+    document.getElementById('month-checklist-field').style.display = 'block';
+    calculate();
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     onMonthCheck(m)
+     Called when the user clicks a month cell checkbox.
+     Toggles the green "checked" highlight class on the cell
+     and immediately recalculates the results.
+     m = month number (1 = January … 12 = December)
+  ───────────────────────────────────────────────────────── */
+  function onMonthCheck(m) {
+    const cb   = document.getElementById('mc-' + m);
+    const cell = cb.closest('.month-cell');
+    cell.classList.toggle('checked', cb.checked);
     calculate();
   }
 
@@ -1193,12 +1657,12 @@
       reduction = excess / 2;
       netSS     = Math.max(0, totalSS - reduction);
 
-      rows += buildRow('Total SS in one year',                fmt(totalSS));
+      rows += buildRow('Total Social Security in one year',                fmt(totalSS));
       rows += buildRow('2026 earnings limit',                 '$24,480');
       rows += buildRow('Excess earnings',                     fmt(excess));
       rows += buildRow('Benefit reduction ($1 per $2 excess)',
                        excess > 0 ? '\u2212' + fmt(reduction) : fmt(0), excess > 0);
-      rows += buildRow('SS benefit after reduction',          fmt(netSS));
+      rows += buildRow('Benefit after reduction',          fmt(netSS));
 
     /* ── Scenario B ── */
     } else if (sc === 'fra_year') {
@@ -1213,42 +1677,112 @@
       reduction = excess / 3;
       netSS     = Math.max(0, totalSS - reduction);
 
-      rows += buildRow('Total SS in one year',                      fmt(totalSS));
+      rows += buildRow('Total Social Security in one year',                      fmt(totalSS));
       rows += buildRow('2026 FRA-year earnings limit',              '$59,520');
       rows += buildRow('Wages counted (' + monthsBefore + ' months before FRA)', fmt(countedWages));
       rows += buildRow('Excess earnings',                           fmt(excess));
       rows += buildRow('Benefit reduction ($1 per $3 excess)',
                        excess > 0 ? '\u2212' + fmt(reduction) : fmt(0), excess > 0);
-      rows += buildRow('SS benefit after reduction',                fmt(netSS));
+      rows += buildRow('Social Security benefit after reduction',                fmt(netSS));
 
-    /* ── Scenario C ── */
+    /* ── Scenario C: First year collecting — UPDATED ────────────
+       REPLACES the old simplified estimate with a precise
+       month-by-month calculation driven by the user's checklist.
+
+       The user has checked each month where they expect to earn
+       $2,040 or less. This function counts:
+         monthsPaidChecked — checked months in the test window
+                             (under $2,040 → full benefit paid)
+         monthsWithheld    — unchecked months in the test window
+                             (over $2,040 → benefit withheld)
+         monthsPostFRA     — months after the FRA month (hybrid case)
+                             (no earnings test → full benefit paid)
+         monthsBeforeStart — months before collecting started
+                             (no benefit at all)
+
+       Net SS = monthly benefit × (monthsPaidChecked + monthsPostFRA)
+       Total  = wages + netSS
+
+       NOTE: If the user has not yet interacted with the checklist,
+       all months in the window will be unchecked (over limit),
+       which is the conservative default.
+    ─────────────────────────────────────────────────────────── */
     } else if (sc === 'first_year') {
-      const MONTHLY_LIMIT  = 2040;
-      const startMonth     = parseInt(document.getElementById('start-month').value);
-
-      /* Total months the person collects SS (startMonth through December) */
-      const monthsCollecting = 13 - startMonth;
-
-      /* Assume wages are spread evenly: annual ÷ 12 = monthly estimate */
-      const monthlyWages = wages / 12;
 
       /*
-        If estimated monthly wages exceed the limit, every collecting month
-        is withheld. If not, no months are withheld and full benefits are paid.
-        (Simplified: the actual SSA rule checks each month individually.)
-      */
-      const monthsWithheld = (monthlyWages > MONTHLY_LIMIT) ? monthsCollecting : 0;
-      const monthsReceived = 12 - monthsWithheld;
+        NEW LOGIC — month-by-month earnings test
+        ─────────────────────────────────────────
+        The checklist tells us exactly which months the user
+        expects to earn $2,040 or less ("under limit").
 
-      netSS     = monthly * monthsReceived;
+        For each month in the earnings-test window:
+          • Checked (under limit) → full monthly benefit paid
+          • Unchecked (over limit) → benefit withheld
+
+        For months AFTER the FRA month (hybrid case):
+          • No earnings test → full benefit paid automatically
+
+        monthsPaid    = checked months + post-FRA months
+        monthsWithheld= unchecked months within the test window
+      */
+
+      const startMonth  = parseInt(document.getElementById('start-month').value);
+      const fraThisYear = document.querySelector('input[name="fra-this-year"]:checked').value === 'yes';
+      const fraMonth    = fraThisYear
+        ? parseInt(document.getElementById('fra-this-year-month').value)
+        : 13; /* 13 = no FRA cutoff */
+
+      const testEnd = Math.min(12, fraMonth - 1);
+
+      /* Count months in each category */
+      let monthsPaidChecked   = 0; /* under limit — full benefit */
+      let monthsWithheld      = 0; /* over limit — withheld */
+      let monthsPostFRA       = 0; /* after FRA — no test, full benefit */
+      let monthsBeforeStart   = startMonth - 1; /* not collecting yet */
+
+      for (let m = 1; m <= 12; m++) {
+        if (m < startMonth) {
+          /* Not collecting yet — no benefit */
+          monthsBeforeStart++;
+        } else if (fraThisYear && m >= fraMonth) {
+          /* Post-FRA: full benefit, no test */
+          monthsPostFRA++;
+        } else {
+          /* In earnings-test window: check the checkbox state */
+          const cb = document.getElementById('mc-' + m);
+          if (cb && cb.checked) {
+            monthsPaidChecked++; /* Under $2,040 — full benefit */
+          } else {
+            monthsWithheld++;    /* Over $2,040 — withheld */
+          }
+        }
+      }
+
+      /* Correct the double-count from the loop (monthsBeforeStart already set above) */
+      monthsBeforeStart = startMonth - 1;
+
+      const monthsPaidTotal = monthsPaidChecked + monthsPostFRA;
+      netSS     = monthly * monthsPaidTotal;
       reduction = totalSS - netSS;
 
-      rows += buildRow('Total SS if no penalty',     fmt(totalSS));
-      rows += buildRow('Monthly earnings limit',     '$2,040');
-      rows += buildRow('Estimated monthly wages',    fmt(monthlyWages));
-      rows += buildRow('Months collecting SS',       monthsCollecting);
-      rows += buildRow('Months benefits paid',       monthsReceived);
-      rows += buildRow('SS benefit after reduction', fmt(netSS), reduction > 0);
+      /* Build result rows */
+      rows += buildRow('Total Social Security if no penalty (12 months)', fmt(totalSS));
+      rows += buildRow('Monthly earnings limit', '$2,040/month');
+      rows += buildRow('Months before collecting (no benefit)', monthsBeforeStart);
+      rows += buildRow('Months under $2,040 — benefit paid', monthsPaidChecked);
+      rows += buildRow('Months over $2,040 — benefit withheld', monthsWithheld);
+
+      if (fraThisYear && monthsPostFRA > 0) {
+        rows += buildRow('Months after FRA — full benefit (no test)', monthsPostFRA);
+      }
+
+      rows += buildRow('Total months Social Security benefit paid', monthsPaidTotal);
+
+      if (reduction > 0) {
+        rows += buildRow('Total Social Security withheld', '\u2212' + fmt(reduction), true);
+      }
+
+      rows += buildRow('Net Social Security benefit received', fmt(netSS));
     }
 
     /* ── Write results to the DOM ── */
